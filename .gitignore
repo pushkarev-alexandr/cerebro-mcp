@@ -1,0 +1,6 @@
+__pycache__/
+.claude/
+.venv/
+venv/
+.vscode/
+pycerebro/
