@@ -265,6 +265,18 @@ class UserTasksInput(BaseModel):
     include_done: bool = Field(False, description="Include tasks with progress=100%")
 
 
+class UserSubscriptionTypesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    universe_id: Optional[int] = Field(
+        None,
+        description=(
+            "Cerebro organization (universe) ID. If omitted, uses the only "
+            "organization available to the authenticated user."
+        ),
+        gt=0,
+    )
+
+
 class MessageIdInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message_id: int = Field(..., description="Cerebro message ID (integer)", gt=0)
@@ -455,6 +467,100 @@ async def cerebro_get_users(params: EmptyInput, ctx: Context) -> str:
         rows = await asyncio.to_thread(_db(ctx).users)
         users = [_user_to_dict(u) for u in (rows or [])]
         return json.dumps(users, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool(
+    name="cerebro_get_user_subscription_types",
+    annotations={
+        "title": "Get User Subscription Types",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    },
+)
+async def cerebro_get_user_subscription_types(
+    params: UserSubscriptionTypesInput, ctx: Context
+) -> str:
+    """Return the subscription type for every user in a Cerebro organization.
+
+    Cerebro keeps a user's freelance status on their organization membership,
+    rather than on the global user account. The result classifies each account
+    as ``freelance``, ``standard``, ``service``, or ``lumpen`` and includes a
+    summary count for every type.
+
+    Args:
+        params (UserSubscriptionTypesInput):
+            - universe_id: Cerebro organization ID. Omit it when the current
+              authenticated user has access to exactly one organization.
+
+    Returns:
+        str: JSON object containing the organization ID, users, and summary.
+    """
+    try:
+        db = _db(ctx)
+        universe_id = params.universe_id
+
+        if universe_id is None:
+            universes = await asyncio.to_thread(
+                db.execute,
+                'select * from "uniUserList_00"(get_usid())',
+            )
+            if len(universes) != 1:
+                choices = [
+                    {"id": u[1], "name": u[4]}
+                    for u in (universes or [])
+                ]
+                return (
+                    "Error: Specify universe_id; the authenticated user has "
+                    f"access to {len(choices)} organizations: "
+                    f"{json.dumps(choices, ensure_ascii=False)}"
+                )
+            universe_id = universes[0][1]
+
+        rows = await asyncio.to_thread(
+            db.execute,
+            'select ul.uid, "userNameDisplay"(ul.uid), '
+            '"isUserFickle"(?::int, ul.uid), '
+            '(select flags from "userQuery_01"(ul.uid)) '
+            'from "userListByUniverse"(?::int, 0) as ul order by 2',
+            universe_id,
+            universe_id,
+        )
+
+        users = []
+        summary: dict[str, int] = {}
+        for user_id, full_name, is_freelance, user_flags in rows or []:
+            # These flags mirror Cerebro's own userSetType() implementation.
+            if is_freelance:
+                subscription_type = "freelance"
+            elif user_flags is not None and (user_flags & (1 << 2)) != 0:
+                subscription_type = "service"
+            elif user_flags is not None and (user_flags & (1 << 16)) != 0:
+                subscription_type = "lumpen"
+            else:
+                subscription_type = "standard"
+
+            users.append(
+                {
+                    "id": user_id,
+                    "full_name": full_name,
+                    "subscription_type": subscription_type,
+                }
+            )
+            summary[subscription_type] = summary.get(subscription_type, 0) + 1
+
+        return json.dumps(
+            {
+                "universe_id": universe_id,
+                "users": users,
+                "summary": summary,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
     except Exception as e:
         return f"Error: {e}"
 
