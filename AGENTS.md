@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## Project Overview
 
-CerebroMCP is a FastMCP-based MCP server that exposes read-only access to the Cerebro project management system via MCP tools. It connects LLM clients (Claude and others) to Cerebro's database over HTTPS/RPC.
+CerebroMCP uses the MCP Python SDK 2.x (`MCPServer`) to expose read-only access to the Cerebro project management system via MCP tools. It connects MCP-compatible clients to Cerebro's database over HTTPS/RPC.
 
 ## Commands
 
@@ -29,7 +29,7 @@ python -c "import pycerebro; print('OK')"
 
 ## Architecture
 
-**`server.py`** — entry point. Defines all MCP tools using `@mcp.tool` decorators on a `FastMCP` instance. A single shared `Database` connection is created in a lifespan context manager and retrieved per-request via `_db(ctx)`.
+**`server.py`** — entry point. Defines all MCP tools using `@mcp.tool` decorators on an `MCPServer` instance from `mcp.server.mcpserver`. A single shared `Database` connection is created in a lifespan context manager and retrieved per-request via `_db(ctx)`.
 
 **`pycerebro/database.py`** — the heavy module (~2200+ lines). Wraps all RPC calls to Cerebro servers over HTTPS. Connection targets are hard-coded (`login1–4.cerebrohq.com`, port 4443). Handles reconnection on transient SQL state errors (`08000`, `08003`, etc.). Has both read-only (`z_execute(True, ...)`) and write (`z_execute(False, ...)`) paths — the public `execute()` method always uses the write path but is safe for SELECT queries.
 
@@ -88,8 +88,10 @@ Dates are stored as `float` days offset from **January 1, 2000**. The `_days_to_
 
 ## Environment Variables
 
-- `CEREBRO_USER` — Cerebro login username (required)
-- `CEREBRO_PASSWORD` — Cerebro login password (required)
+- `CEREBRO_USER` — Cerebro login username (required only for fallback authentication)
+- `CEREBRO_PASSWORD` — Cerebro login password (required only for fallback authentication)
+
+At startup, `app_lifespan` first calls `connect_from_cerebro_client()` to use the session of a locally running, signed-in Cerebro client. If it does not return `CLIENT_CONNECTED`, both environment variables are required for `connect()` as a fallback.
 
 ## Key Constants (`dbtypes.py`)
 

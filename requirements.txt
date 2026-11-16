@@ -1,4 +1,4 @@
 iso8601
 requests
 urllib3
-FastMCP
+mcp==2.3.0

@@ -3,8 +3,8 @@
 MCP Server for Cerebro project management system.
 
 Provides read-only access to Cerebro tasks, messages, and users
-via the pycerebro library. Credentials are supplied through
-CEREBRO_USER and CEREBRO_PASSWORD environment variables.
+via the pycerebro library. Uses the running Cerebro client's session first,
+with CEREBRO_USER and CEREBRO_PASSWORD as fallback credentials.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ import sys
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from pydantic import BaseModel, ConfigDict, Field
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -74,20 +74,25 @@ TAG_TYPE_NAMES = {
 
 @asynccontextmanager
 async def app_lifespan(app):
-    user = os.environ.get("CEREBRO_USER", "")
-    password = os.environ.get("CEREBRO_PASSWORD", "")
-    if not user or not password:
-        raise RuntimeError("CEREBRO_USER and CEREBRO_PASSWORD environment variables must be set")
-
     db = database.Database()
-    await asyncio.to_thread(db.connect, user, password)
     try:
+        status = await asyncio.to_thread(db.connect_from_cerebro_client)
+        if status != db.CLIENT_CONNECTED:
+            user = os.environ.get("CEREBRO_USER", "")
+            password = os.environ.get("CEREBRO_PASSWORD", "")
+            if not user or not password:
+                raise RuntimeError(
+                    "Could not connect through the local Cerebro client. "
+                    "Open Cerebro and sign in on this computer, or set both "
+                    "CEREBRO_USER and CEREBRO_PASSWORD for fallback authentication."
+                )
+            await asyncio.to_thread(db.connect, user, password)
         yield {"db": db}
     finally:
         await asyncio.to_thread(db.disconnect)
 
 
-mcp = FastMCP("cerebro_mcp", lifespan=app_lifespan)
+mcp = MCPServer("cerebro_mcp", lifespan=app_lifespan)
 
 
 # ---------------------------------------------------------------------------

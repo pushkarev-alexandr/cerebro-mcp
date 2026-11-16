@@ -19,6 +19,8 @@ For the full list of tools, see [AGENTS.md](AGENTS.md).
 
 The `pycerebro` library is included in this repository in the [pycerebro](pycerebro/) folder. No manual copying is required.
 
+Requires Python 3.10 or newer. The MCP Python SDK is pinned to `mcp==2.3.0` in `requirements.txt`.
+
 ### 1. Create a virtual environment and install dependencies
 
 ```powershell
@@ -33,11 +35,17 @@ pip install -r requirements.txt
 ```powershell
 python -m py_compile server.py
 python -c "import pycerebro; print('OK')"
+python -c "import server; print('OK')"
+python -m unittest discover -s tests -v
 ```
 
 ### 3. Connect your MCP client
 
 Choose the instructions for your client below.
+
+At startup, the server first tries to use the session of an open Cerebro application on the same computer. Sign in to Cerebro before connecting your MCP client. This uses the account signed in to Cerebro, even if fallback credentials are configured.
+
+If the local Cerebro session is unavailable, the server falls back to `CEREBRO_USER` and `CEREBRO_PASSWORD`. Both are required for this fallback. The examples below include these optional credentials; omit the environment section if you only want to connect through the open application.
 
 #### Codex
 
@@ -59,7 +67,7 @@ CEREBRO_USER = "your_login@example.com"
 CEREBRO_PASSWORD = "your_password"
 ```
 
-Replace `C:\path\to\project` with the actual project folder path, and set `CEREBRO_USER` and `CEREBRO_PASSWORD` to your Cerebro credentials. The single-quoted TOML paths use literal backslashes, so no escaping is needed.
+Replace `C:\path\to\project` with the actual project folder path. For fallback authentication, set `CEREBRO_USER` and `CEREBRO_PASSWORD` to your Cerebro credentials; otherwise, omit the `[mcp_servers.cerebro.env]` section. The single-quoted TOML paths use literal backslashes, so no escaping is needed.
 
 Start a new Codex session after saving. If you have the Codex CLI installed, run `codex mcp list` to check that `cerebro` is configured, and use `/mcp` inside the CLI to inspect active MCP servers.
 
@@ -92,6 +100,6 @@ Add to the `mcpServers` section:
 }
 ```
 
-Replace `C:\\path\\to\\project` with the actual project folder path, and set `CEREBRO_USER` and `CEREBRO_PASSWORD` to your Cerebro credentials.
+Replace `C:\\path\\to\\project` with the actual project folder path. For fallback authentication, set `CEREBRO_USER` and `CEREBRO_PASSWORD` to your Cerebro credentials; otherwise, remove the `env` object and the comma after the `args` array.
 
 Restart Claude Desktop after saving.
