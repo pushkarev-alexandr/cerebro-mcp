@@ -1,6 +1,6 @@
 # CerebroMCP
 
-MCP server for working with the [Cerebro](https://cerebrohq.com) project management system. Lets Claude and other LLM clients read data from Cerebro: tasks, messages, users, attachments, and more.
+MCP server for working with the [Cerebro](https://cerebrohq.com) project management system. Provides MCP-compatible clients with read-only access to Cerebro data: tasks, messages, users, attachments, and more.
 
 ## Features
 
@@ -17,15 +17,9 @@ For the full list of tools, see [AGENTS.md](AGENTS.md).
 
 ## Installation
 
-### 1. Copy the pycerebro library
+The `pycerebro` library is included in this repository in the [pycerebro](pycerebro/) folder. No manual copying is required.
 
-The library is not included in this repository. Copy the `pycerebro` folder from your Cerebro installation into the project root:
-
-```
-C:\Program Files\Cerebro\py-site-packages\pycerebro  →  <project folder>\pycerebro
-```
-
-### 2. Create a virtual environment and install dependencies
+### 1. Create a virtual environment and install dependencies
 
 ```powershell
 cd <project folder>
@@ -34,14 +28,44 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3. Verify the installation
+### 2. Verify the installation
 
 ```powershell
 python -m py_compile server.py
 python -c "import pycerebro; print('OK')"
 ```
 
-### 4. Connect to Claude Desktop
+### 3. Connect your MCP client
+
+Choose the instructions for your client below.
+
+#### Codex
+
+Open or create the user configuration file:
+
+```text
+%USERPROFILE%\.codex\config.toml
+```
+
+Add the following configuration:
+
+```toml
+[mcp_servers.cerebro]
+command = 'C:\path\to\project\.venv\Scripts\python.exe'
+args = ['C:\path\to\project\server.py']
+
+[mcp_servers.cerebro.env]
+CEREBRO_USER = "your_login@example.com"
+CEREBRO_PASSWORD = "your_password"
+```
+
+Replace `C:\path\to\project` with the actual project folder path, and set `CEREBRO_USER` and `CEREBRO_PASSWORD` to your Cerebro credentials. The single-quoted TOML paths use literal backslashes, so no escaping is needed.
+
+Start a new Codex session after saving. If you have the Codex CLI installed, run `codex mcp list` to check that `cerebro` is configured, and use `/mcp` inside the CLI to inspect active MCP servers.
+
+For more configuration options, see the [official OpenAI MCP documentation](https://developers.openai.com/codex/mcp).
+
+#### Claude Desktop
 
 Open the configuration file:
 
